@@ -57,10 +57,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-// Configuration pour accepter les fichiers volumineux
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
