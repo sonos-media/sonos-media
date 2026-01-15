@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { v2 as cloudinary } from "cloudinary";
+
+// Configuration Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,31 +33,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Créer le dossier videos s'il n'existe pas
-    const videosDir = path.join(process.cwd(), "public", "videos");
-    if (!existsSync(videosDir)) {
-      await mkdir(videosDir, { recursive: true });
-    }
-
-    // Générer un nom de fichier unique
-    const timestamp = Date.now();
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const fileName = `${timestamp}-${originalName}`;
-    const filePath = path.join(videosDir, fileName);
-
-    // Convertir le fichier en buffer et l'écrire
+    // Convertir le fichier en buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
 
-    // Retourner l'URL publique
-    const publicUrl = `/videos/${fileName}`;
+    // Upload vers Cloudinary
+    const uploadResponse = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "video",
+          folder: "sonos-media",
+          format: "mp4",
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(buffer);
+    });
 
-    return NextResponse.json({ url: publicUrl });
-  } catch (error) {
+    const result = uploadResponse as any;
+
+    // Retourner l'URL de la vidéo
+    return NextResponse.json({ 
+      url: result.secure_url,
+      thumbnail: result.secure_url.replace(/\.[^.]+$/, '.jpg'), // Cloudinary génère automatiquement une thumbnail
+    });
+  } catch (error: any) {
     console.error("Erreur lors de l'upload:", error);
     return NextResponse.json(
-      { error: "Erreur lors de l'upload du fichier" },
+      { error: "Erreur lors de l'upload du fichier", details: error.message },
       { status: 500 }
     );
   }
