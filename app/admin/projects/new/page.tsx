@@ -53,21 +53,38 @@ export default function NewProjectPage() {
     setUploading(true);
 
     try {
-      // 1. Upload de la vidéo
-      const videoFormData = new FormData();
-      videoFormData.append("file", videoFile);
+      // 1. Upload direct vers Cloudinary (client-side)
+      const cloudinaryFormData = new FormData();
+      cloudinaryFormData.append("file", videoFile);
+      cloudinaryFormData.append("upload_preset", "sonos-media"); // Preset non signé
+      cloudinaryFormData.append("folder", "sonos-media");
 
-      const uploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        body: videoFormData,
+      const xhr = new XMLHttpRequest();
+      
+      // Suivi de la progression
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(percentComplete);
+        }
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error("Erreur lors de l'upload de la vidéo");
-      }
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.addEventListener("load", () => {
+          if (xhr.status === 200) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error("Erreur lors de l'upload"));
+          }
+        });
+        xhr.addEventListener("error", () => reject(new Error("Erreur réseau")));
+        
+        xhr.open("POST", "https://api.cloudinary.com/v1_1/dqeqguuic/video/upload");
+        xhr.send(cloudinaryFormData);
+      });
 
-      const { url: videoUrl } = await uploadResponse.json();
-      setUploadProgress(100);
+      const uploadResult: any = await uploadPromise;
+      const videoUrl = uploadResult.secure_url;
 
       // 2. Créer le projet avec l'URL de la vidéo
       const projectResponse = await fetch("/api/projects", {
@@ -76,6 +93,7 @@ export default function NewProjectPage() {
         body: JSON.stringify({
           ...formData,
           videoUrl,
+          thumbnail: videoUrl.replace(/\.[^.]+$/, '.jpg'),
         }),
       });
 
