@@ -90,7 +90,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/10 mt-8 pt-8 text-center">
-          <p className="text-secondary text-sm">
+          <p className="text-secondary text-sm" suppressHydrationWarning>
             © {new Date().getFullYear()} Sonos Media. Tous droits réservés.
           </p>
         </div>

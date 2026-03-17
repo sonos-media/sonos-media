@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate && next build",
+  "buildCommand": "sed -i 's/provider = \"sqlite\"/provider = \"postgresql\"/' prisma/schema.prisma && prisma generate && next build",
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["cdg1"]

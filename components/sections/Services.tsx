@@ -12,9 +12,12 @@ export default function Services() {
 
   useEffect(() => {
     fetch("/api/services")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
       .then((data) => {
-        setServices(data);
+        setServices(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => {

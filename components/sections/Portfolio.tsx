@@ -18,7 +18,10 @@ export default function Portfolio() {
   useEffect(() => {
     // Charger les projets
     fetch("/api/projects")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
       .then((data) => {
         setProjects(Array.isArray(data) ? data : []);
         setLoading(false);
@@ -31,7 +34,10 @@ export default function Portfolio() {
 
     // Charger les catégories
     fetch("/api/categories")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
       .then((data) => {
         const categoryNames = Array.isArray(data) ? data.map((c: any) => c.name) : [];
         setCategories(["Tous", ...categoryNames]);
@@ -41,10 +47,11 @@ export default function Portfolio() {
       });
   }, []);
 
+  const validProjects = Array.isArray(projects) ? projects.filter((p) => p && typeof p.id !== "undefined") : [];
   const filteredProjects =
     activeCategory === "Tous"
-      ? projects
-      : projects.filter((p) => p.category === activeCategory);
+      ? validProjects
+      : validProjects.filter((p) => p.category === activeCategory);
 
   return (
     <section ref={ref} className="py-20 sm:py-32 relative">
@@ -116,12 +123,12 @@ export default function Portfolio() {
                 )}
                 <div className="mt-4">
                   <span className="text-accent text-xs font-medium uppercase tracking-wide">
-                    {project.category}
+                    {project?.category ?? ""}
                   </span>
                   <h3 className="text-lg font-semibold text-primary mt-1 mb-1 group-hover:text-accent transition-colors line-clamp-2">
-                    {project.title}
+                    {project?.title ?? ""}
                   </h3>
-                  <p className="text-secondary text-sm line-clamp-2">{project.description}</p>
+                  <p className="text-secondary text-sm line-clamp-2">{project?.description ?? ""}</p>
                 </div>
               </div>
             </motion.div>

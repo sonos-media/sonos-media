@@ -24,19 +24,26 @@ export default function ProjectsGrid() {
   useEffect(() => {
     // Charger les projets
     fetch("/api/projects")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
       .then((data) => {
-        setProjects(data);
+        setProjects(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((error) => {
         console.error("❌ Erreur lors du chargement des projets:", error);
+        setProjects([]);
         setLoading(false);
       });
 
     // Charger les catégories
     fetch("/api/categories")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
       .then((data) => {
         const categoryNames = Array.isArray(data) ? data.map((c: any) => c.name) : [];
         setCategories(["Tous", ...categoryNames]);

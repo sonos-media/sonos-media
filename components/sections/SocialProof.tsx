@@ -12,9 +12,12 @@ export default function SocialProof() {
 
   useEffect(() => {
     fetch("/api/testimonials")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
       .then((data) => {
-        setTestimonials(data);
+        setTestimonials(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => {
