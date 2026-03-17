@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: "Sonos Media - Agence de création de contenu premium",
   description: "Sonos Media crée du contenu vidéo premium pour Instagram, TikTok.",
   keywords: "création de contenu, vidéo, social media, marketing digital, Instagram, TikTok, YouTube",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
