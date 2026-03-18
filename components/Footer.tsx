@@ -64,7 +64,7 @@ export default function Footer() {
             <p className="text-secondary text-sm mb-2">hello@sonosmedia.fr</p>
             <div className="flex space-x-4 mt-4">
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/sonos_media"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-secondary hover:text-accent transition-colors"
