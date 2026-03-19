@@ -53,14 +53,24 @@ export default function NewProjectPage() {
     setUploading(true);
 
     try {
-      // 1. Upload direct vers Cloudinary (client-side)
+      // 1. Obtenir une signature sécurisée depuis le serveur
+      const sigResponse = await fetch("/api/upload/signature");
+      if (!sigResponse.ok) {
+        throw new Error("Session expirée, veuillez vous reconnecter");
+      }
+      const { signature, timestamp, folder, cloudName, apiKey } = await sigResponse.json();
+
+      // 2. Upload signé direct vers Cloudinary (sans preset requis, supporte gros fichiers)
       const cloudinaryFormData = new FormData();
       cloudinaryFormData.append("file", videoFile);
-      cloudinaryFormData.append("upload_preset", "sonos-media"); // Preset non signé
-      cloudinaryFormData.append("folder", "sonos-media");
+      cloudinaryFormData.append("timestamp", String(timestamp));
+      cloudinaryFormData.append("signature", signature);
+      cloudinaryFormData.append("api_key", apiKey);
+      cloudinaryFormData.append("folder", folder);
+      cloudinaryFormData.append("resource_type", "video");
 
       const xhr = new XMLHttpRequest();
-      
+
       // Suivi de la progression
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
@@ -71,22 +81,29 @@ export default function NewProjectPage() {
 
       const uploadPromise = new Promise((resolve, reject) => {
         xhr.addEventListener("load", () => {
-          if (xhr.status === 200) {
-            resolve(JSON.parse(xhr.responseText));
-          } else {
-            reject(new Error("Erreur lors de l'upload"));
+          try {
+            const result = JSON.parse(xhr.responseText);
+            if (xhr.status === 200) {
+              resolve(result);
+            } else {
+              reject(new Error("Cloudinary erreur " + xhr.status + " : " + (result.error?.message || xhr.responseText)));
+            }
+          } catch {
+            reject(new Error("Réponse invalide de Cloudinary"));
           }
         });
-        xhr.addEventListener("error", () => reject(new Error("Erreur réseau")));
-        
-        xhr.open("POST", "https://api.cloudinary.com/v1_1/dqeqguuic/video/upload");
+        xhr.addEventListener("error", () => reject(new Error("Connexion interrompue — vérifiez votre réseau ou réduisez la taille du fichier")));
+        xhr.addEventListener("timeout", () => reject(new Error("Timeout — fichier trop lourd ou connexion trop lente")));
+        xhr.timeout = 300000; // 5 minutes max
+
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`);
         xhr.send(cloudinaryFormData);
       });
 
       const uploadResult: any = await uploadPromise;
 
       if (!uploadResult.secure_url) {
-        throw new Error("Upload Cloudinary échoué : " + JSON.stringify(uploadResult));
+        throw new Error("Upload échoué : " + JSON.stringify(uploadResult));
       }
 
       const videoUrl = uploadResult.secure_url;
