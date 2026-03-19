@@ -34,8 +34,14 @@ export default function NewProjectPage() {
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const maxSize = 100 * 1024 * 1024; // 100MB
+      if (file.size > maxSize) {
+        const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+        alert(`⚠️ Vidéo trop lourde : ${sizeMB}MB\n\nLimite Cloudinary (plan gratuit) : 100MB\n\nCompressez votre vidéo avec HandBrake (gratuit) avant de l'uploader.`);
+        e.target.value = "";
+        return;
+      }
       setVideoFile(file);
-      // Créer une URL de prévisualisation
       const previewUrl = URL.createObjectURL(file);
       setVideoPreview(previewUrl);
     }
