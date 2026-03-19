@@ -84,6 +84,11 @@ export default function NewProjectPage() {
       });
 
       const uploadResult: any = await uploadPromise;
+
+      if (!uploadResult.secure_url) {
+        throw new Error("Upload Cloudinary échoué : " + JSON.stringify(uploadResult));
+      }
+
       const videoUrl = uploadResult.secure_url;
 
       // 2. Créer le projet avec l'URL de la vidéo
@@ -100,11 +105,12 @@ export default function NewProjectPage() {
       if (projectResponse.ok) {
         router.push("/admin");
       } else {
-        alert("Erreur lors de la création du projet");
+        const errData = await projectResponse.json().catch(() => ({}));
+        throw new Error("Erreur API (" + projectResponse.status + ") : " + (errData.error || "inconnue"));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur:", error);
-      alert("Erreur lors de la création du projet");
+      alert("Erreur : " + (error.message || "inconnue"));
     } finally {
       setLoading(false);
       setUploading(false);
