@@ -60,50 +60,55 @@ export default function NewProjectPage() {
       }
       const { signature, timestamp, folder, cloudName, apiKey } = await sigResponse.json();
 
-      // 2. Upload signé direct vers Cloudinary (sans preset requis, supporte gros fichiers)
-      const cloudinaryFormData = new FormData();
-      cloudinaryFormData.append("file", videoFile);
-      cloudinaryFormData.append("timestamp", String(timestamp));
-      cloudinaryFormData.append("signature", signature);
-      cloudinaryFormData.append("api_key", apiKey);
-      cloudinaryFormData.append("folder", folder);
-      cloudinaryFormData.append("resource_type", "video");
+      // 2. Upload par morceaux (chunked) vers Cloudinary — supporte les fichiers lourds
+      const CHUNK_SIZE = 20 * 1024 * 1024; // 20 MB par morceau
+      const uniqueUploadId = `upload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const totalSize = videoFile.size;
+      const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+      let uploadResult: any = null;
 
-      const xhr = new XMLHttpRequest();
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, totalSize);
+        const chunk = videoFile.slice(start, end);
 
-      // Suivi de la progression
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(percentComplete);
-        }
-      });
+        const chunkFormData = new FormData();
+        chunkFormData.append("file", chunk, videoFile.name);
+        chunkFormData.append("api_key", apiKey);
+        chunkFormData.append("timestamp", String(timestamp));
+        chunkFormData.append("signature", signature);
+        chunkFormData.append("folder", folder);
 
-      const uploadPromise = new Promise((resolve, reject) => {
-        xhr.addEventListener("load", () => {
-          try {
-            const result = JSON.parse(xhr.responseText);
-            if (xhr.status === 200) {
-              resolve(result);
-            } else {
-              reject(new Error("Cloudinary erreur " + xhr.status + " : " + (result.error?.message || xhr.responseText)));
-            }
-          } catch {
-            reject(new Error("Réponse invalide de Cloudinary"));
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+          {
+            method: "POST",
+            headers: {
+              "X-Unique-Upload-Id": uniqueUploadId,
+              "Content-Range": `bytes ${start}-${end - 1}/${totalSize}`,
+            },
+            body: chunkFormData,
           }
-        });
-        xhr.addEventListener("error", () => reject(new Error("Connexion interrompue — vérifiez votre réseau ou réduisez la taille du fichier")));
-        xhr.addEventListener("timeout", () => reject(new Error("Timeout — fichier trop lourd ou connexion trop lente")));
-        xhr.timeout = 300000; // 5 minutes max
+        );
 
-        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`);
-        xhr.send(cloudinaryFormData);
-      });
+        // 200 = terminé, 206 = morceau accepté, continue
+        if (response.status !== 200 && response.status !== 206) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(
+            "Cloudinary erreur " + response.status + " : " + (errBody.error?.message || JSON.stringify(errBody))
+          );
+        }
 
-      const uploadResult: any = await uploadPromise;
+        if (response.status === 200) {
+          uploadResult = await response.json();
+        }
 
-      if (!uploadResult.secure_url) {
-        throw new Error("Upload échoué : " + JSON.stringify(uploadResult));
+        // Mettre à jour la progression
+        setUploadProgress(Math.round((end / totalSize) * 100));
+      }
+
+      if (!uploadResult?.secure_url) {
+        throw new Error("Upload incomplet — aucune URL retournée par Cloudinary");
       }
 
       const videoUrl = uploadResult.secure_url;
@@ -231,7 +236,9 @@ export default function NewProjectPage() {
           {uploading && (
             <div className="bg-white/5 border border-white/10 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-primary text-sm">Upload en cours...</span>
+                <span className="text-primary text-sm">
+                  {uploadProgress < 100 ? "Upload en cours..." : "Finalisation..."}
+                </span>
                 <span className="text-accent text-sm font-medium">{uploadProgress}%</span>
               </div>
               <div className="w-full bg-white/10 rounded-full h-2">
